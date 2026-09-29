@@ -1,3 +1,9 @@
+vyatta-interfaces-l2tpeth (0.1.17) trixie; urgency=medium
+
+  * Port to Debian 13 (trixie): debhelper-compat 13, Standards-Version 4.7.2, Rules-Requires-Root, NuDanOS Vcs.
+
+ -- NuDanOS Maintainers <jon@fernandez.tech>  Mon, 28 Sep 2026 23:09:07 -0700
+
 vyatta-interfaces-l2tpeth (0.1.16) unstable; urgency=medium
 
   [ Manohar Rapeti ]

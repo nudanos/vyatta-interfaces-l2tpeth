@@ -1,13 +1,18 @@
 Source: vyatta-interfaces-l2tpeth
-Section: contrib/net
-Priority: extra
-Maintainer: Vyatta Package Maintainers <DL-vyatta-help@att.com>
-Build-Depends: debhelper (>= 9), dh-yang, cpio
-Standards-Version: 3.9.6
+Section: net
+Priority: optional
+Maintainer: NuDanOS Maintainers <jon@fernandez.tech>
+Build-Depends: debhelper-compat (= 13),
+ dh-yang,
+ cpio
+Standards-Version: 4.7.2
+Rules-Requires-Root: no
+Vcs-Git: https://github.com/nudanos/vyatta-interfaces-l2tpeth.git
+Vcs-Browser: https://github.com/nudanos/vyatta-interfaces-l2tpeth
 
 Package: vyatta-interfaces-l2tpeth
 Architecture: all
-Depends:
+Depends: 
  bmon (>= 3.5),
  vyatta-cfg,
  vyatta-interfaces (>= 0.5),
@@ -15,12 +20,12 @@ Depends:
  ${misc:Depends},
  ${perl:Depends},
  libvyatta-dataplane-proto-support
-Conflicts:
+Conflicts: 
  vyatta-op (<< 1.0),
  vyatta-interfaces-l2tpeth-v1-yang (<< 0.1.0),
  vyatta-interfaces-vhost-xconnect-v1-yang (<< 0.1.0),
  vyatta-xconnect-v1-yang (<< 0.1.0)
-Replaces:
+Replaces: 
  vyatta-op (<< 1.0),
  vyatta-interfaces-l2tpeth-v1-yang (<< 0.1.0),
  vyatta-interfaces-vhost-xconnect-v1-yang (<< 0.1.0),
@@ -30,7 +35,7 @@ Description: Vyatta L2TPETH dataplane interface
 
 Package: vyatta-interfaces-l2tpeth-v1-yang
 Architecture: all
-Depends:
+Depends: 
  ifmgrd,
  vyatta-interfaces-l2tpeth (>= ${source:Version}),
  ${misc:Depends},
@@ -40,7 +45,7 @@ Description: Vyatta L2TPETH dataplane interface
 
 Package: vyatta-xconnect-v1-yang
 Architecture: all
-Depends:
+Depends: 
  vyatta-interfaces-l2tpeth (>= ${source:Version}),
  ${misc:Depends},
  ${yang:Depends}
@@ -49,7 +54,7 @@ Description: vyatta-xconnect-v1 module
 
 Package: vyatta-interfaces-vhost-xconnect-v1-yang
 Architecture: all
-Depends:
+Depends: 
  vyatta-interfaces-l2tpeth (>= ${source:Version}),
  ${misc:Depends},
  ${yang:Depends}
