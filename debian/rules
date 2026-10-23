@@ -11,3 +11,6 @@
 
 %:
 	dh $@ --with yang
+
+override_dh_auto_test:
+	prove -It/lib t/*.t

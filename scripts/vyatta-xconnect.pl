@@ -3,7 +3,7 @@
 #
 # Copyright (c) 2019-2021 AT&T Intellectual Property. All Rights Reserved.
 # Copyright (c) 2014-2016, Brocade Communications Systems, Inc.
-# 
+#
 # SPDX-License-Identifier: GPL-2.0-only
 #
 
@@ -17,18 +17,19 @@ use Vyatta::VPlaned;
 
 use vyatta::proto::XConnectConfig;
 
-die "$#ARGV Usage: $0 action dp_ifname\n" unless ($#ARGV == 1);
+die "$#ARGV Usage: $0 action dp_ifname\n" unless ( $#ARGV == 1 );
 
-my ($action, $ifname) = @ARGV;
+my ( $action, $ifname ) = @ARGV;
 
-my $intf = new Vyatta::Interface($ifname);
-my $cfg = new Vyatta::Config($intf->path());
+my $intf       = Vyatta::Interface->new($ifname);
+my $cfg        = Vyatta::Config->new( $intf->path() );
 my $l2tpifname = $cfg->returnValue('xconnect l2tpeth');
 
 if ( defined($l2tpifname) ) {
-    my $l2tpintf = new Vyatta::Interface($l2tpifname);
-    my $l2tpcfg = new Vyatta::Config($l2tpintf->path());
-    if (not ($l2tpcfg->exists("l2tp-session"))) {
+    my $l2tpintf = Vyatta::Interface->new($l2tpifname);
+    my $l2tpcfg  = Vyatta::Config->new( $l2tpintf->path() );
+    if ( not( $l2tpcfg->exists("l2tp-session") ) ) {
+
         # This legacy Perl script handles xconnect for static L2TPv3 sessions
         # ("l2tp-session" defined for an l2tpeth interface). If the l2tpeth
         # interface being cross-connected represents in fact a dynamic L2TPv3
@@ -38,80 +39,65 @@ if ( defined($l2tpifname) ) {
     }
 }
 
-my $oldl2tpifname = $cfg->returnOrigValue('xconnect l2tpeth');
-my $xconn_ttl = $cfg->returnValue('xconnect ttl');
-my $vhostifname = $cfg->returnValue('xconnect vhost');
-my $oldvhostifname = $cfg->returnOrigValue('xconnect vhost');
-my $dp_ifname = $cfg->returnValue('xconnect dataplane');
-my $olddp_ifname = $cfg->returnOrigValue('xconnect dataplane');
+# The cross-connected peer: the last configured of l2tpeth, vhost and
+# dataplane, read with $get (returnValue or returnOrigValue).
+sub peer {
+    my ($get) = @_;
+    my ($peer) =
+      grep { defined } reverse map { $cfg->$get("xconnect $_") } qw(l2tpeth vhost dataplane);
+    return $peer;
+}
 
-my $peer_ifname = $l2tpifname if (defined($l2tpifname));
-$peer_ifname = $vhostifname if (defined($vhostifname));
-$peer_ifname = $dp_ifname if (defined($dp_ifname));
-my $old_peer_ifname = $oldl2tpifname if (defined($oldl2tpifname));
-$old_peer_ifname = $oldvhostifname if (defined($oldvhostifname));
-$old_peer_ifname = $olddp_ifname if (defined($olddp_ifname));
+my $peer_ifname     = peer('returnValue');
+my $old_peer_ifname = peer('returnOrigValue');
+my $xconn_ttl       = $cfg->returnValue('xconnect ttl');
 
 XConnectConfig::CommandType->import(":constants");
 
-if ( $action eq 'SET' ) {
-    if ( defined($l2tpifname) ) {
-	set_xconnect_port_l2tpeth("add", $ifname, $peer_ifname, $xconn_ttl);
+sub set_xconnect_port_l2tpeth {
+    my ( $cmd, $new_ifname ) = @_;
+    my $ctrl = Vyatta::VPlaned->new();
+    my $ttl  = $xconn_ttl // "255";
+
+    $ctrl->store( "interfaces dataplane $ifname xconnect",
+        "l2tpeth -c $cmd $ifname $new_ifname $ttl" );
+    return;
+}
+
+sub set_xconnect_port {
+    my ( $cmd, $new_ifname ) = @_;
+    my $ctrl = Vyatta::VPlaned->new();
+
+    my $xconnect = XConnectConfig->new(
+        {
+            cmd        => $cmd,
+            dp_ifname  => $ifname,
+            new_ifname => $new_ifname,
+        }
+    );
+
+    $ctrl->store_pb( "interfaces dataplane $ifname xconnect", $xconnect, "vyatta:xconnect" );
+    return;
+}
+
+# What to tell the dataplane: (operation, peer), or () for nothing.
+sub change {
+    return ( 'add', $peer_ifname )        if $action eq 'SET';
+    return ( 'remove', $old_peer_ifname ) if $action eq 'DELETE';
+    return                                if !defined $old_peer_ifname;
+    return ( 'remove', $old_peer_ifname ) if !defined $peer_ifname;
+    return ( 'update', $peer_ifname );
+}
+
+my %pb_command = ( add => ADD(), remove => REMOVE(), update => UPDATE() );
+my ( $op, $peer ) = change();
+if ( defined $op ) {
+    if ( defined $l2tpifname ) {
+        set_xconnect_port_l2tpeth( $op, $peer );
     }
     else {
-	set_xconnect_port(ADD(), $ifname, $peer_ifname);
-    }
-} elsif ( $action eq 'DELETE' ) {
-    if ( defined($l2tpifname) ) {
-	set_xconnect_port_l2tpeth("remove", $ifname, $old_peer_ifname, $xconn_ttl);
-    }
-    else {
-	set_xconnect_port(REMOVE(), $ifname, $old_peer_ifname);
-    }
-} elsif ( !defined($peer_ifname && defined($old_peer_ifname) ) ) {
-    if ( defined($l2tpifname) ) {
-	set_xconnect_port_l2tpeth("remove", $ifname, $old_peer_ifname, $xconn_ttl);
-    }
-    else {
-	set_xconnect_port(REMOVE(), $ifname, $old_peer_ifname);
-    }
-} elsif ( defined($old_peer_ifname) ) {
-    if ( defined($l2tpifname) ) {
-	set_xconnect_port_l2tpeth("update", $ifname, $peer_ifname, $xconn_ttl);
-    }
-    else {
-	set_xconnect_port(UPDATE(), $ifname, $peer_ifname);
+        set_xconnect_port( $pb_command{$op}, $peer );
     }
 }
 
 exit 0;
-
-sub set_xconnect_port_l2tpeth {
-    my ($cmd, $dp_ifname, $new_ifname, $xconn_ttl) = @_;
-    my $ctrl = new Vyatta::VPlaned;
-
-    my $ttl = "255";
-    $ttl = $xconn_ttl
-	if defined($xconn_ttl);
-
-    $ctrl->store(
-	"interfaces dataplane $dp_ifname xconnect",
-	"l2tpeth -c $cmd $dp_ifname $new_ifname $ttl"
-	);
-}
-
-sub set_xconnect_port {
-    my ($cmd, $dp_ifname, $new_ifname) = @_;
-    my $ctrl = new Vyatta::VPlaned;
-
-    my $xconnect = XConnectConfig->new({
-	cmd        => $cmd,
-	dp_ifname  => $dp_ifname,
-	new_ifname => $new_ifname,
-				       });
-	
-    $ctrl->store_pb(
-	"interfaces dataplane $dp_ifname xconnect",
-	$xconnect,
-	"vyatta:xconnect");
-}
